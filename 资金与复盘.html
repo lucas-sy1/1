@@ -39,6 +39,7 @@
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
   <div class="max-w-6xl mx-auto p-6">
+    <!-- 标题 -->
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-4xl font-bold flex items-center gap-3">
         🚀 我的 Meme 交易追踪 & 每日复盘
@@ -54,10 +55,12 @@
       </div>
     </div>
 
+    <!-- 警示 -->
     <div class="warning-banner">
       ⚠️ 保住本金，切勿 FOMO
     </div>
 
+    <!-- 输入区域 -->
     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8">
       <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div>
@@ -91,6 +94,7 @@
         </div>
       </div>
 
+      <!-- 标签 -->
       <div class="mt-4">
         <label class="block text-sm text-zinc-400 mb-2">当天主要情绪 / 行为（可多选）</label>
         <div class="flex flex-wrap gap-2" id="tags-container">
@@ -111,19 +115,26 @@
       </button>
     </div>
 
+    <!-- 统计卡片 -->
     <div id="stats" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8"></div>
 
+    <!-- 资金曲线 -->
     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-8">
       <h2 class="text-xl font-semibold mb-4">账户资金曲线（含充值/提现）</h2>
       <canvas id="fundChart" height="120"></canvas>
     </div>
 
+    <!-- 历史记录 -->
     <div class="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden mb-8">
       <div class="flex justify-between items-center p-6 border-b border-zinc-800">
         <h2 class="text-xl font-semibold">历史记录</h2>
         <div class="flex gap-3">
           <button onclick="exportCSV()" class="bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-lg text-sm">CSV</button>
           <button onclick="exportExcel()" class="bg-green-700 hover:bg-green-800 px-5 py-2 rounded-lg text-sm font-medium">Excel</button>
+          <label class="bg-blue-600 hover:bg-blue-700 px-5 py-2 rounded-lg text-sm cursor-pointer">
+            导入 Excel/CSV
+            <input type="file" id="importFile" accept=".xlsx,.xls,.csv" class="hidden">
+          </label>
           <button onclick="clearAll()" class="bg-red-600/80 hover:bg-red-700 px-5 py-2 rounded-lg text-sm">清空</button>
         </div>
       </div>
@@ -367,7 +378,6 @@
       let html = '';
       let balance = initialCapital;
       const cumMap = {};
-
       sortedEntries.forEach(e => {
         balance += e.deposit - e.withdrawal + e.change;
         cumMap[e.id] = balance;
@@ -384,8 +394,8 @@
         if (e.notes.length > 50) {
           noteDisplay = e.notes.substring(0, 47) + '...';
           noteClass = 'text-blue-400 hover:underline cursor-pointer';
-          const escapedNote = e.notes.replace(/'/g, "\\'").replace(/"/g, '\\"');
-          onclick = `onclick="showFullNote('${escapedNote}')"`; 
+          const escaped = e.notes.replace(/'/g, "\\'").replace(/"/g, '\\"');
+          onclick = `onclick="showFullNote('${escaped}')"`; 
         }
 
         html += `
@@ -450,6 +460,7 @@
       renderChart();
     }
 
+    // 导出 CSV
     function exportCSV() {
       if (!entries.length) return alert('无数据');
       let csv = '\uFEFF日期,币种,交易盈亏($),充值($),提现($),余额($),标签,笔记\n';
@@ -468,10 +479,10 @@
       URL.revokeObjectURL(url);
     }
 
+    // 导出 Excel
     function exportExcel() {
       if (!entries.length) return alert('无数据');
       const cum = calculateCumulative();
-
       const header = ["日期", "币种", "交易盈亏($)", "充值($)", "提现($)", "账户余额($)", "标签", "笔记"];
       const rows = cum.map(e => [
         e.date,
@@ -483,12 +494,8 @@
         e.tags.join('; '),
         e.notes
       ]);
-
-      const wsData = [header, ...rows];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-      ws['!cols'] = [{wch:12}, {wch:10}, {wch:14}, {wch:12}, {wch:12}, {wch:14}, {wch:30}, {wch:60}];
-
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      ws['!cols'] = [{wch:12},{wch:10},{wch:14},{wch:12},{wch:12},{wch:14},{wch:30},{wch:60}];
       const range = XLSX.utils.decode_range(ws['!ref']);
       for (let R = 1; R <= range.e.r; ++R) {
         for (let C = 2; C <= 5; ++C) {
@@ -496,11 +503,111 @@
           if (ws[addr]) ws[addr].z = '#,##0.00';
         }
       }
-
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "交易记录");
       XLSX.writeFile(wb, `meme记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
+
+    // 导入 Excel / CSV
+    document.getElementById('importFile').addEventListener('change', async function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(event) {
+        try {
+          let imported = [];
+
+          if (file.name.toLowerCase().endsWith('.csv')) {
+            const text = event.target.result;
+            const lines = text.split('\n').filter(l => l.trim());
+            if (lines.length < 2) throw new Error('CSV 文件为空或无数据行');
+
+            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+
+            for (let i = 1; i < lines.length; i++) {
+              const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+              const entry = {};
+              headers.forEach((h, idx) => {
+                let v = vals[idx] || '';
+                if (/日期/.test(h)) entry.date = v;
+                else if (/币种/.test(h)) entry.coin = v;
+                else if (/交易盈亏|盈亏/.test(h)) entry.change = parseFloat(v) || 0;
+                else if (/充值/.test(h)) entry.deposit = parseFloat(v) || 0;
+                else if (/提现/.test(h)) entry.withdrawal = parseFloat(v) || 0;
+                else if (/笔记|复盘/.test(h)) entry.notes = v;
+                else if (/标签|標籤/.test(h)) entry.tags = v ? v.split(';').map(t => t.trim()) : [];
+              });
+              if (entry.date) {
+                entry.id = Date.now() + i;
+                imported.push(entry);
+              }
+            }
+          } else {
+            // Excel (.xlsx / .xls)
+            const data = new Uint8Array(event.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+            if (json.length < 2) throw new Error('Excel 文件为空或无数据行');
+
+            const headers = json[0].map(h => (h || '').toString().trim());
+
+            for (let i = 1; i < json.length; i++) {
+              const row = json[i];
+              const entry = {};
+              headers.forEach((h, idx) => {
+                let v = row[idx] ?? '';
+                if (/日期/.test(h)) entry.date = v.toString();
+                else if (/币种/.test(h)) entry.coin = v.toString();
+                else if (/交易盈亏|盈亏/.test(h)) entry.change = parseFloat(v) || 0;
+                else if (/充值/.test(h)) entry.deposit = parseFloat(v) || 0;
+                else if (/提现/.test(h)) entry.withdrawal = parseFloat(v) || 0;
+                else if (/笔记|复盘/.test(h)) entry.notes = v.toString();
+                else if (/标签|標籤/.test(h)) entry.tags = v ? v.toString().split(';').map(t => t.trim()) : [];
+              });
+              if (entry.date) {
+                entry.id = Date.now() + i;
+                imported.push(entry);
+              }
+            }
+          }
+
+          if (imported.length === 0) {
+            alert('文件没有有效记录，或表头格式不匹配');
+            return;
+          }
+
+          // 避免日期重复（可根据需要修改逻辑）
+          const existingDates = new Set(entries.map(e => e.date));
+          const newEntries = imported.filter(e => !existingDates.has(e.date));
+
+          if (newEntries.length > 0) {
+            entries = [...entries, ...newEntries];
+            updateSortedEntries();
+            saveData();
+            renderAll();
+            alert(`成功导入 ${newEntries.length} 笔新记录！`);
+          } else {
+            alert('导入的记录全部已存在，没有新增数据');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('导入失败：' + err.message + '\n请使用本站导出的文件，或检查文件格式');
+        }
+
+        // 清空文件输入
+        e.target.value = '';
+      };
+
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
+    });
 
     function clearAll() {
       if (!confirm('确定清空所有记录？不可恢复！')) return;
