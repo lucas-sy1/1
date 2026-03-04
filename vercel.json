@@ -1,12 +1,1 @@
-{
-  "version": 2,
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "static": { 
-    "files": [ "index.html" ] 
-  }
-}
+{\n  "version": 2,\n  "routes": []\n}
