@@ -1,1 +1,1 @@
-{\n  "version": 2,\n  "routes": []\n}
+{"version": 2, "routes": [{"src": "/(.*)", "dest": "/index.html"}]}
